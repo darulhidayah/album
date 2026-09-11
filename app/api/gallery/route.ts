@@ -48,12 +48,50 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const programsWithCount = (progRes.data || []).map((p: any) => ({
-      ...p,
-      count: progCountMap[p.id] || 0,
-    }));
+    // 2. Fetch manual covers and latest photos per program for banners
+    const manualProgCoverIds = (progRes.data || []).map((p: any) => p.cover_media_id).filter(Boolean);
+    const manualCoverMap: Record<string, string> = {};
+    if (manualProgCoverIds.length) {
+      const { data: manualMedia } = await supabase
+        .from("media")
+        .select("id, blogger_url")
+        .in("id", manualProgCoverIds);
+      (manualMedia || []).forEach((m: any) => {
+        manualCoverMap[m.id] = m.blogger_url;
+      });
+    }
 
-    // 2. Fetch paginated media
+    // Latest media per program
+    const { data: latestMedia } = await supabase
+      .from("media")
+      .select("id, program_id, blogger_url, metadata")
+      .eq("organization_id", ORG_ID)
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    const latestProgCoverMap: Record<string, string> = {};
+    const progDateMap: Record<string, string> = {};
+
+    (latestMedia || []).forEach((m: any) => {
+      if (m.program_id && !latestProgCoverMap[m.program_id]) {
+        latestProgCoverMap[m.program_id] = m.blogger_url;
+      }
+      if (m.program_id && !progDateMap[m.program_id] && m.metadata?.tanggal) {
+        progDateMap[m.program_id] = m.metadata.tanggal;
+      }
+    });
+
+    const programsWithCount = (progRes.data || []).map((p: any) => {
+      const resolvedCover = (p.cover_media_id && manualCoverMap[p.cover_media_id]) || latestProgCoverMap[p.id] || null;
+      return {
+        ...p,
+        count: progCountMap[p.id] || 0,
+        cover: resolvedCover,
+        date: progDateMap[p.id] || null,
+      };
+    });
+
+    // 3. Fetch paginated media
     let query = supabase
       .from("media")
       .select("*", { count: "exact" })

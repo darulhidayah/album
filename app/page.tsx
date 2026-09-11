@@ -23,9 +23,11 @@ type Program = {
   name: string;
   slug: string;
   count: number;
+  cover?: string | null;
+  date?: string | null;
 };
 
-function formatDisplayDate(manualDate?: string, fallbackCreatedAt?: string, full = false): string {
+function formatDisplayDate(manualDate?: string | null, fallbackCreatedAt?: string, full = false): string {
   if (manualDate) {
     const parts = String(manualDate).split("-");
     if (parts.length === 3) {
@@ -131,6 +133,13 @@ export default function AlbumHomePage() {
   function handleSelectProgram(progId: string) {
     setActiveProg(progId);
     setSearchQuery("");
+    window.scrollTo({ top: 380, behavior: "smooth" });
+  }
+
+  function handleBackToAllAlbums() {
+    setActiveProg("");
+    setSearchQuery("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleLoadMore() {
@@ -147,10 +156,9 @@ export default function AlbumHomePage() {
     window.open(url, "_blank");
   }
 
-  const activeProgramName = useMemo(() => {
-    if (!activeProg) return "Semua Koleksi Foto";
-    const found = programs.find((p) => p.id === activeProg);
-    return found ? found.name : "Koleksi Program";
+  const activeProgramObj = useMemo(() => {
+    if (!activeProg) return null;
+    return programs.find((p) => p.id === activeProg) || null;
   }, [activeProg, programs]);
 
   return (
@@ -174,7 +182,7 @@ export default function AlbumHomePage() {
       {/* 2. Main Header */}
       <header className="header-main">
         <div className="header-inner">
-          <div className="brand-group">
+          <div className="brand-group" onClick={handleBackToAllAlbums} style={{ cursor: "pointer" }}>
             <img src="/logo.png" alt="Logo Darul Hidayah" className="brand-logo" />
             <div className="brand-text">
               <h1>ALBUM DARUL HIDAYAH</h1>
@@ -182,8 +190,23 @@ export default function AlbumHomePage() {
             </div>
           </div>
           <div className="header-nav">
+            {/* Quick Program Jump Dropdown */}
+            <select
+              className="program-select-dropdown"
+              value={activeProg}
+              onChange={(e) => handleSelectProgram(e.target.value)}
+              aria-label="Pilih Album Program"
+            >
+              <option value="">📁 Semua Album Program ({programs.length})</option>
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.count} foto)
+                </option>
+              ))}
+            </select>
+
             <a href="https://mdh.or.id/#pricing-wrapper" target="_blank" rel="noreferrer" className="header-btn">
-              <span>💚</span> Donasi Masjid
+              <span>💚</span> Donasi
             </a>
           </div>
         </div>
@@ -192,16 +215,16 @@ export default function AlbumHomePage() {
       {/* 3. Hero Section */}
       <section className="hero-banner">
         <div className="hero-content">
-          <div className="hero-badge">DOKUMENTASI RESMI</div>
-          <h2 className="hero-title">Galeri Dokumentasi & Arsip Visual</h2>
+          <div className="hero-badge">ARSIP DOKUMENTASI VISUAL</div>
+          <h2 className="hero-title">Koleksi Album Masjid Darul Hidayah</h2>
           <p className="hero-desc">
-            Menyajikan rekaman visual perjalanan dakwah, santunan anak yatim, pembinaan generasi Qur'ani (TPQ), dan pembangunan Masjid Darul Hidayah.
+            Menyajikan rekaman visual perjalanan dakwah, santunan anak yatim, pembinaan santri TPQ, peringatan hari besar Islam, dan pembangunan masjid.
           </p>
           <form className="hero-search-box" onSubmit={handleSearchSubmit}>
             <span>🔍</span>
             <input
               type="text"
-              placeholder="Cari foto, kegiatan, atau tahun..."
+              placeholder="Cari foto, acara, atau tahun..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -223,37 +246,99 @@ export default function AlbumHomePage() {
 
       {/* 4. Main Gallery Section */}
       <main className="main-wrap">
-        {/* Program Filter Pills */}
-        <div className="filter-bar" role="tablist">
-          <button
-            type="button"
-            className={`filter-pill ${!activeProg ? "active" : ""}`}
-            onClick={() => handleSelectProgram("")}
-          >
-            <span>Semua Foto</span>
-            <span className="filter-count">{totalMedia}</span>
-          </button>
-          {programs.map((prog) => (
-            <button
-              key={prog.id}
-              type="button"
-              className={`filter-pill ${activeProg === prog.id ? "active" : ""}`}
-              onClick={() => handleSelectProgram(prog.id)}
-            >
-              <span>{prog.name}</span>
-              <span className="filter-count">{prog.count}</span>
-            </button>
-          ))}
-        </div>
+        {/* TIER 1: BERANDA KOLEKSI ALBUM PROGRAM (Jika activeProg belum dipilih) */}
+        {!activeProg && !searchQuery && (
+          <section className="album-folders-section">
+            <div className="section-title-wrap">
+              <div>
+                <h3 className="section-title">📁 Koleksi Album Kegiatan</h3>
+                <span className="section-subtitle">
+                  Pilih album kegiatan di bawah untuk membuka dokumentasi lengkap
+                </span>
+              </div>
+              <span className="album-count-badge">{programs.length} Album Terdaftar</span>
+            </div>
 
-        {/* Gallery Heading Row */}
+            <div className="album-folder-grid">
+              {programs.map((prog) => (
+                <article
+                  key={prog.id}
+                  className="album-folder-card"
+                  onClick={() => handleSelectProgram(prog.id)}
+                >
+                  <div className="album-cover-wrap">
+                    {prog.cover ? (
+                      <img
+                        src={bloggerVariant(prog.cover, "card")}
+                        alt={prog.name}
+                        loading="lazy"
+                        className="album-cover-img"
+                      />
+                    ) : (
+                      <div className="album-cover-placeholder">
+                        <span>📁</span>
+                      </div>
+                    )}
+                    <div className="album-badge-overlay">
+                      <span className="album-badge-photos">📷 {prog.count} Foto</span>
+                      {prog.date && (
+                        <span className="album-badge-date">
+                          📅 {formatDisplayDate(prog.date)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="album-card-body">
+                    <h4 className="album-card-title">{prog.name}</h4>
+                    <div className="album-card-meta">
+                      <span>Buka Galeri Foto</span>
+                      <span className="album-arrow">➔</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* TIER 2: HEADER BANNER SAAT MEMBUKA SALAH SATU ALBUM */}
+        {activeProg && activeProgramObj && (
+          <div className="active-album-banner">
+            <div className="active-album-top">
+              <button
+                type="button"
+                className="back-to-albums-btn"
+                onClick={handleBackToAllAlbums}
+              >
+                ← Kembali ke Semua Album
+              </button>
+              <span className="album-badge-photos">
+                📁 {activeProgramObj.count} Foto Tersedia
+              </span>
+            </div>
+            <h2 className="active-album-title">{activeProgramObj.name}</h2>
+            <div className="active-album-info">
+              {activeProgramObj.date && (
+                <span>📅 <strong>Tanggal Kegiatan:</strong> {formatDisplayDate(activeProgramObj.date, undefined, true)}</span>
+              )}
+              <span>📍 <strong>Lokasi:</strong> Tanah Merah, Boven Digoel</span>
+            </div>
+          </div>
+        )}
+
+        {/* Heading Galeri Foto */}
         <div className="gallery-meta-row">
           <div>
-            <strong>{activeProgramName}</strong>
-            {searchQuery && <span> • Hasil pencarian "{searchQuery}"</span>}
+            <strong>
+              {activeProg
+                ? `Foto Dokumentasi ${activeProgramObj?.name || ""}`
+                : searchQuery
+                ? `Hasil Pencarian "${searchQuery}"`
+                : "✨ Dokumentasi Foto Terbaru"}
+            </strong>
           </div>
           <div>
-            Menampilkan {items.length} foto
+            Menampilkan {items.length} {activeProg ? `dari ${activeProgramObj?.count || items.length}` : ""} foto
           </div>
         </div>
 
@@ -261,14 +346,14 @@ export default function AlbumHomePage() {
         {loading ? (
           <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--muted)" }}>
             <div style={{ fontSize: "28px", marginBottom: "8px" }}>⏳</div>
-            <p>Memuat koleksi foto Darul Hidayah...</p>
+            <p>Memuat koleksi foto...</p>
           </div>
         ) : items.length === 0 ? (
           <div style={{ padding: "60px 20px", textAlign: "center", background: "#fff", border: "1px dashed var(--line)", borderRadius: "16px" }}>
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>📷</div>
             <h3 style={{ margin: "0 0 4px" }}>Belum Ada Foto</h3>
             <p style={{ color: "var(--muted)", fontSize: "12px", margin: 0 }}>
-              Tidak ada dokumentasi foto yang sesuai dengan pilihan atau pencarian ini.
+              Tidak ada dokumentasi foto yang sesuai dengan pilihan ini.
             </p>
           </div>
         ) : (
